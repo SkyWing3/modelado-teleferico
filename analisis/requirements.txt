@@ -1,0 +1,8 @@
+# El script analisis/validacion.py funciona SOLO con la libreria estandar de
+# Python 3 (no requiere instalar nada).
+#
+# Si deseas la verificacion cruzada del p-valor con SciPy (opcional), instala:
+#
+#   pip install -r requirements.txt
+#
+scipy>=1.10

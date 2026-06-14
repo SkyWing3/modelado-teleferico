@@ -1,0 +1,20 @@
+{
+  "name": "miteleferico-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulacion 3D de una estacion de Mi Teleferico (ABM) con Next.js y React Three Fiber",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@react-three/drei": "9.109.2",
+    "@react-three/fiber": "8.17.6",
+    "next": "^14.2.33",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "three": "0.167.1"
+  }
+}
