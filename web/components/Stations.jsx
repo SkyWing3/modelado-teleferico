@@ -1,6 +1,6 @@
 "use client";
 
-import { Html } from "@react-three/drei";
+import { Text } from "@react-three/drei";
 import { STATIONS, FLOW, terrainY } from "../lib/simulation";
 
 // Flecha de flujo (chevron) sobre el piso, apuntando a una direccion
@@ -21,28 +21,55 @@ function Arrow({ x, y, z, dir = "x", color = "#39d98a" }) {
   );
 }
 
-function Sign({ x, y, z, text, sub, bg, df = 90 }) {
+// Cartel 3D fisico dentro de la estacion: poste + panel de color + texto.
+// rotY orienta la cara legible del panel (0 mira a +z, PI a -z, etc.).
+function Sign({ x, y, z, text, sub, bg, rotY = 0, w = 3.2 }) {
+  const panelH = sub ? 1.0 : 0.7;
+  const poleH = 2.0;
+  const panelY = poleH + panelH / 2;
   return (
-    <Html position={[x, y, z]} center distanceFactor={df} zIndexRange={[8, 0]}>
-      <div
-        style={{
-          padding: "4px 11px",
-          borderRadius: 8,
-          background: bg,
-          color: "#fff",
-          fontWeight: 800,
-          fontSize: 18,
-          letterSpacing: 1,
-          whiteSpace: "nowrap",
-          textAlign: "center",
-          border: "2px solid rgba(255,255,255,0.85)",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-        }}
-      >
-        {text}
-        {sub && <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.95 }}>{sub}</div>}
-      </div>
-    </Html>
+    <group position={[x, y, z]}>
+      {/* poste (simetrico, no necesita rotacion) */}
+      <mesh position={[0, poleH / 2, 0]} castShadow>
+        <cylinderGeometry args={[0.07, 0.07, poleH, 8]} />
+        <meshStandardMaterial color="#566072" metalness={0.4} roughness={0.6} />
+      </mesh>
+      {/* panel orientable + texto */}
+      <group rotation={[0, rotY, 0]}>
+        <mesh position={[0, panelY, 0]} castShadow>
+          <boxGeometry args={[w, panelH, 0.1]} />
+          <meshStandardMaterial color={bg} emissive={bg} emissiveIntensity={0.25} />
+        </mesh>
+        {/* marco blanco delgado */}
+        <mesh position={[0, panelY, -0.02]}>
+          <boxGeometry args={[w + 0.14, panelH + 0.14, 0.08]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+        <Text
+          position={[0, panelY + (sub ? 0.18 : 0), 0.07]}
+          fontSize={0.42}
+          color="#ffffff"
+          anchorX="center"
+          anchorY="middle"
+          fontWeight="bold"
+          outlineWidth={0.012}
+          outlineColor="#000000"
+        >
+          {text}
+        </Text>
+        {sub && (
+          <Text
+            position={[0, panelY - 0.26, 0.07]}
+            fontSize={0.24}
+            color="#f3f3f3"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {sub}
+          </Text>
+        )}
+      </group>
+    </group>
   );
 }
 
@@ -165,24 +192,28 @@ function StationStruct({ index }) {
         <meshStandardMaterial color="#7a1414" transparent opacity={0.5} />
       </mesh>
 
-      {/* carteles de circulacion */}
-      <Sign x={bx + FLOW.entranceX} y={by + 2.7} z={0} text="ENTRADA ▶" bg="rgba(34,120,55,0.95)" />
-      <Sign x={bx + FLOW.exitX} y={by + 2.7} z={0} text="◀ SALIDA" bg="rgba(34,90,150,0.95)" />
+      {/* carteles 3D de circulacion (poste + panel dentro de la estacion) */}
+      <Sign x={bx + FLOW.entranceX} y={topDeck} z={0} text="ENTRADA" bg="#2f8f43" rotY={Math.PI / 2} w={2.8} />
+      <Sign x={bx + FLOW.exitX} y={topDeck} z={0} text="SALIDA" bg="#2f6fb0" rotY={-Math.PI / 2} w={2.4} />
       <Sign
         x={bx}
-        y={by + 2.4}
+        y={topDeck}
         z={FLOW.platUpZ - 2.2}
-        text="▲ SUBIDA"
+        text="SUBIDA"
         sub="hacia El Alto"
-        bg="rgba(180,140,20,0.95)"
+        bg="#b48c14"
+        rotY={0}
+        w={2.6}
       />
       <Sign
         x={bx}
-        y={by + 2.4}
+        y={topDeck}
         z={FLOW.platDownZ + 2.2}
-        text="▼ BAJADA"
+        text="BAJADA"
         sub="hacia La Paz"
-        bg="rgba(180,90,40,0.95)"
+        bg="#b45a28"
+        rotY={Math.PI}
+        w={2.6}
       />
     </group>
   );

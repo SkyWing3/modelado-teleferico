@@ -14,7 +14,8 @@
 export const STATIONS = [
   { name: "Estación Central", nick: "Taypi Uta", base: [0, 0, 0] },
   { name: "Cementerio", nick: "Ajayuni", base: [95, 16, 0] },
-  { name: "16 de Julio", nick: "Jach'a Qhathu", base: [190, 32, 0] },
+  // 16 de Julio esta en El Alto: una meseta mucho mas alta que La Paz.
+  { name: "16 de Julio", nick: "Jach'a Qhathu", base: [190, 70, 0] },
 ];
 
 // Puntos clave del flujo dentro de una estacion (relativos a la base)
@@ -58,8 +59,12 @@ function circDist(a, b, L) {
 }
 
 // Altura del terreno (ladera La Paz -> El Alto) en funcion de x
+// Perfil del terreno por tramos: pendiente suave de La Paz (Central->Cementerio),
+// ascenso pronunciado por la "ceja" y meseta plana de El Alto (16 de Julio).
 export function terrainY(x) {
-  return -1 + 0.168 * x;
+  if (x <= 95) return -1 + 0.1684 * x; // valle de La Paz  (-1 -> 15)
+  if (x <= 190) return 15 + 0.5684 * (x - 95); // subida a El Alto (15 -> 69)
+  return 69; // meseta de El Alto
 }
 
 // --- Construccion del bucle cerrado del cable (geometria estatica) ---
