@@ -4,22 +4,25 @@ Checklist y pasos concretos para la exposición del 15 de junio.
 
 ## A. Abrir y correr el modelo (Simulación en vivo — 20 pts)
 
-1. Instala **NetLogo** (versión de escritorio, 6.2 o superior) desde
-   <https://ccl.northwestern.edu/netlogo/>.
+1. Instala **NetLogo** (versión de escritorio, **7.0.4** recomendada) desde
+   <https://ccl.northwestern.edu/netlogo/>. El modelo abre también en 6.x; en
+   NetLogo 7 se convierte automáticamente al nuevo formato `.nlogox` al guardar.
 2. Abre `modelo/MiTeleferico.nlogo`.
-3. Pulsa **setup** (se dibuja la estación con sus zonas de colores y aparecen
-   las cabinas) y luego **go**.
+3. Pulsa **setup** (se dibuja la **Línea Roja** con sus tres estaciones, las dos
+   vías y las cabinas) y luego **go**.
 4. **Activa la vista 3D:** en la esquina superior derecha de la vista del mundo,
    pulsa el botón **"3D"**. Verás las personas y las cabinas (cajas rojas)
    renderizadas en tres dimensiones; puedes rotar con el ratón. Esto cumple el
    requerimiento de entorno tridimensional sin depender de un archivo
    `.nlogo3d` aparte (el mismo modelo se renderiza en 3D).
 5. Durante la defensa, **mueve los sliders** para mostrar el efecto en tiempo
-   real sobre las gráficas de filas y el monitor de espera promedio:
-   - sube `tasa-llegada-usuarios` → crece la fila del andén;
-   - baja `cantidad-cajas-abiertas` a 1 → la fila de caja se dispara (cuello
-     de botella);
-   - sube `cantidad-cajas-abiertas` o `prob-tarjeta` → la espera baja.
+   real sobre las gráficas (personas por estación, tiempos promedio) y los
+   monitores:
+   - baja `cantidad-cajas-abiertas` a 1 → la fila de caja se dispara y la espera
+     total salta a ~200 s (cuello de botella, ρ > 1 en Central);
+   - sube `cantidad-cajas-abiertas` a 3 o `prob-tarjeta` a 70 % → la espera baja
+     a ~11 s;
+   - baja `numero-cabinas` → crece la fila del andén (capacidad de transporte).
 
 ## A-bis. Demo web 3D (impacto visual)
 
@@ -40,9 +43,9 @@ Node.js 18.18+.)
 ## B. Experimentación masiva (BehaviorSpace)
 
 1. Menú **Tools ▸ BehaviorSpace**.
-2. Verás tres experimentos ya configurados:
-   - `1-Validacion-Baseline` (30 corridas del escenario real).
-   - `2-Escenarios-Cajas` (varía las cajas de 1 a 4).
+2. Verás tres experimentos ya configurados (λ = 70/min, 18 cabinas):
+   - `1-Validacion-Baseline` (30 corridas del escenario real, espera total ~17 s).
+   - `2-Escenarios-Cajas` (varía las cajas/estación de 1 a 4).
    - `3-Escenario-Tarjeta` (varía el % de tarjeta: 40/55/70/85).
 3. Selecciona uno, pulsa **Run**, marca **Table output** y elige dónde guardar
    el `.csv`. Cada experimento corre 3600 ticks (1 hora) por repetición.
@@ -81,6 +84,10 @@ Interpretación: **p > 0.05 ⇒ modelo validado**.
 - *¿Por qué Poisson y exponencial?* → supuestos estándar de teoría de colas;
   llegadas independientes y servicio sin memoria (ver Ecuaciones §1–2).
 - *¿Cómo sé que el modelo es confiable?* → prueba t de Welch contra datos reales,
-  p = 0.94 > 0.05 (no se rechaza H0).
-- *¿Cuál es tu propuesta de mejora?* → abrir una tercera caja reduce la espera
-  total ~56 %; promover la tarjeta tiene un efecto similar (ver experimentación).
+  p = 0.93 > 0.05 (no se rechaza H0).
+- *¿Cuál es tu propuesta de mejora?* → abrir una tercera caja por estación reduce
+  la espera total ~36 % (17→11 s); subir la tarjeta de 55 % a 70 % la reduce ~64 %
+  (ver experimentación).
+- *¿Por qué el andén no es el cuello de botella?* → con 18 cabinas la capacidad de
+  transporte (~35/min por paradero) supera la demanda; el límite está en las cajas
+  de las estaciones terminales (Central y 16 de Julio).

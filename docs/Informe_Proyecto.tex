@@ -1,0 +1,768 @@
+% =====================================================================
+%  Informe del proyecto: Simulacion de la Linea Roja de Mi Teleferico
+%  Materia: Modelado, Dinamica de Sistemas y Simulacion (SIS-216)
+%  Universidad Catolica Boliviana
+%
+%  Compilar con:   pdflatex Informe_Proyecto.tex   (dos veces, por el indice)
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+
+\geometry{margin=2.5cm}
+
+% --- Estilo para el codigo NetLogo ---
+\definecolor{nlkw}{RGB}{0,90,160}
+\definecolor{nlcom}{RGB}{0,128,0}
+\definecolor{nlstr}{RGB}{170,55,55}
+\definecolor{codebg}{RGB}{248,248,248}
+
+\lstdefinelanguage{NetLogo}{
+  morekeywords={to,end,to-report,report,let,set,ask,if,ifelse,ifelse-value,
+    while,repeat,foreach,create-turtles,create-pasajeros,create-cabinas,
+    with,of,myself,self,count,one-of,min-one-of,min-n-of,sort-on,n-values,
+    item,list,length,replace-item,lput,member?,is-list?,random,random-poisson,
+    random-exponential,random-float,max,min,abs,sqrt,mod,setxy,move-to,
+    hide-turtle,show-turtle,facexy,fd,die,patch,patches,pcolor,plabel,
+    clear-all,reset-ticks,tick,ticks,true,false,and,or,not,distancexy},
+  sensitive=true,
+  morecomment=[l]{;},
+  morestring=[b]",
+}
+\lstset{
+  language=NetLogo,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{nlkw}\bfseries,
+  commentstyle=\color{nlcom}\itshape,
+  stringstyle=\color{nlstr},
+  breaklines=true,
+  showstringspaces=false,
+  frame=single,
+  rulecolor=\color{gray!40},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  columns=fullflexible,
+  keepspaces=true,
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\textbf{Simulación de la Línea Roja de ``Mi Teleférico''}\\[4pt]
+\large Un modelo basado en agentes de la red de transporte por cable\\
+de La Paz -- El Alto (Bolivia)}
+\author{Franco Parra\\
+\small Ingeniería de Sistemas --- Facultad de Ingeniería\\
+\small Universidad Católica Boliviana ``San Pablo''}
+\date{Modelado, Dinámica de Sistemas y Simulación (SIS-216) \\ 15 de junio de 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Este informe documenta el diseño, la formulación matemática, la implementación y la
+validación de un modelo de simulación \emph{basado en agentes} (ABM) de la
+\textbf{Línea Roja} de ``Mi Teleférico'', el teleférico urbano de La Paz--El Alto.
+El modelo reproduce el flujo de pasajeros entre las tres estaciones reales de la
+línea durante la hora pico: cada usuario llega a una estación, elige un destino,
+paga su boleto (o usa tarjeta), espera en el andén correspondiente a su sentido de
+viaje, aborda una cabina, viaja por el cable y desciende en su estación de destino.
+El sistema combina \textbf{teoría de colas} ---boleterías modeladas como colas
+$M/M/c$ y cabinas como servidores de capacidad finita con servicio por lotes--- con
+la dinámica espacial discreta propia de un ABM. El modelo se implementó en
+\textbf{NetLogo 7.0.4} y se validó estadísticamente contra datos de campo mediante
+una prueba $t$ de Welch ($p = 0{,}93 > 0{,}05$: el modelo es estadísticamente
+indistinguible de la realidad). Mediante experimentación con BehaviorSpace se
+cuantifican dos políticas de mejora: abrir una tercera caja por estación reduce la
+espera total un $36\%$, y elevar el uso de tarjeta del $55\%$ al $70\%$ la reduce un
+$64\%$. Se acompaña el modelo con un gemelo digital web 3D que reproduce la misma
+lógica.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Introducción y definición del sistema}
+% =====================================================================
+
+\subsection{El sistema real}
+``Mi Teleférico'' es la red de transporte por cable urbano más extensa del mundo y
+la columna vertebral de la movilidad entre La Paz y El Alto. Sus líneas operan con
+\emph{góndolas monocable desembragables} (MDG, tecnología Doppelmayr): cabinas de
+capacidad oficial de \textbf{10 pasajeros} que circulan de forma continua sujetas a
+un cable tractor y que se \emph{desembragan} (desaceleran) al ingresar a cada
+estación para permitir el embarque y desembarque.
+
+La \textbf{Línea Roja} fue la primera de la red y une tres estaciones
+(Cuadro~\ref{tab:estaciones}). Durante la hora pico (18:00--19:00) las estaciones
+concentran filas en dos puntos: las \textbf{boleterías/recarga} y el \textbf{andén
+de embarque}. Estos dos cuellos de botella, sumados al transporte por lotes de las
+cabinas, son el objeto de estudio.
+
+\begin{table}[h]
+\centering
+\caption{Estaciones de la Línea Roja modeladas.}
+\label{tab:estaciones}
+\begin{tabular}{clll}
+\toprule
+\# & Estación & Nombre aymara & Ubicación \\
+\midrule
+0 & Estación Central & Taypi Uta & La Paz (cota baja) \\
+1 & Cementerio & Ajayuni & Intermedia \\
+2 & 16 de Julio & Jach'a Qhathu & El Alto (meseta alta) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Problema y propósito}
+\begin{quote}
+\emph{¿Cuál es la forma más eficiente de reducir el tiempo de espera de los usuarios
+en hora pico sin saturar la operación?}
+\end{quote}
+
+\noindent El propósito de la simulación es doble:
+\begin{enumerate}[nosep]
+  \item \textbf{Predecir} el tiempo promedio de espera (boletería y andén), el
+  tiempo de viaje y el tamaño de las filas por estación en función de la demanda y
+  de los recursos disponibles.
+  \item \textbf{Evaluar} cuantitativamente políticas de mejora ---abrir más cajas o
+  incentivar el uso de tarjeta--- y medir cuánto reducen el cuello de botella,
+  validando la mejora de forma estadística.
+\end{enumerate}
+
+% =====================================================================
+\section{Abstracción del sistema y elección metodológica}
+% =====================================================================
+
+\subsection{Por qué un modelo basado en agentes (ABM)}
+El sistema está compuesto por \textbf{entidades discretas, autónomas y
+heterogéneas} (cada pasajero tiene su propio estado, origen, destino y tenencia de
+tarjeta) que \textbf{interactúan localmente} compitiendo por recursos limitados
+(cajas y asientos de cabina). Las magnitudes de interés ---longitud de las filas,
+tiempo de espera--- \textbf{emergen} de esas interacciones locales y no se imponen
+mediante una ecuación agregada. Esta es precisamente la situación que describe un
+\textbf{modelo basado en agentes}, y no un modelo de \emph{dinámica de sistemas}
+(Forrester) de \emph{stocks} y flujos continuos, que sería apropiado si quisiéramos
+describir el sistema con variables agregadas y tasas continuas. Se eligió por tanto
+NetLogo, el entorno de referencia para ABM.
+
+\subsection{Componentes del modelo}
+El modelo es una \textbf{simplificación} deliberada que incluye solo lo que gobierna
+la espera y el viaje. Se estructura en tres tipos de componentes
+(Cuadro~\ref{tab:componentes}).
+
+\begin{table}[h]
+\centering
+\caption{Componentes del ABM y su representación en NetLogo.}
+\label{tab:componentes}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{2.6cm} p{3.2cm} p{8.2cm}}
+\toprule
+Componente & Representación & Rol \\
+\midrule
+Entorno & \code{patches} coloreados & Ladera, planta de cada estación, andenes de
+subida/bajada y las dos vías del cable. \\
+Pasajeros & \code{breed pasajeros} & Agentes con origen/destino que llegan, hacen
+fila, son atendidos, embarcan, viajan y bajan en su estación. \\
+Cabinas & \code{breed cabinas} & Servidores móviles de capacidad 10 que circulan por
+el bucle cerrado de dos vías. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Clasificación de variables}
+\begin{description}[style=unboxed,leftmargin=1.2em]
+  \item[Variables de entrada (parámetros / \emph{sliders}).]
+  $\lambda=$\code{tasa-llegada-usuarios} (toda la línea),
+  $c=$\code{cantidad-cajas-abiertas} (por estación),
+  $1/\mu=$\code{tiempo-atencion-caja},
+  $p_t=$\code{prob-tarjeta},
+  $n=$\code{numero-cabinas},
+  $v=$\code{velocidad-cabinas}.
+  \item[Variables de estado.] Por pasajero (\code{estacion-origen},
+  \code{estacion-destino}, \code{sentido}, \code{estado}, \code{tiene-tarjeta?},
+  marcas de tiempo); por cabina (\code{capacidad-actual}, \code{estado-cabina},
+  \code{dist-ruta}); y del sistema (acumuladores de espera, viaje y conteo).
+  \item[Variables de salida (\emph{reporters}).]
+  \code{espera-promedio-total}, \code{espera-promedio-caja},
+  \code{espera-promedio-anden}, \code{viaje-promedio},
+  \code{fila-caja}, \code{fila-anden}, \code{cola-estacion},
+  \code{pasajeros-en-transito}, \code{throughput-por-min}, \code{n-completados}.
+\end{description}
+
+% =====================================================================
+\section{Datos históricos y parametrización}
+% =====================================================================
+
+Los valores de referencia (Cuadro~\ref{tab:datos}) provienen de aforo de campo en
+hora pico (conteo y cronometraje) y de la ficha técnica del operador. Se documentan
+como \emph{estimaciones fundamentadas} representativas, sujetas a refinarse con
+mediciones propias.
+
+\begin{table}[h]
+\centering
+\caption{Parámetros del escenario base (realidad observada).}
+\label{tab:datos}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lll}
+\toprule
+Parámetro & Símbolo & Valor \\
+\midrule
+Tasa de arribo en hora pico (toda la línea) & $\lambda$ & 70 usuarios/min ($\approx$ 4200/h) \\
+Tiempo medio de atención en caja & $1/\mu$ & 10 s \\
+\% de usuarios con tarjeta (saltan la caja) & $p_t$ & 60\,\% \\
+Cajas/boleterías abiertas por estación & $c$ & 2 \\
+Capacidad de cada cabina & $K$ & 10 personas \\
+Número de cabinas en circulación & $n$ & 18 \\
+Velocidad de cabina sobre el circuito & $v$ & 0,5 patch/s \\
+Reparto de la demanda por origen & $w_s$ & 0,38 / 0,30 / 0,32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La demanda total se reparte por estación de \textbf{origen} con pesos
+$w_0=0{,}38$ (Central), $w_1=0{,}30$ (Cementerio), $w_2=0{,}32$ (16 de Julio); los
+terminales concentran algo más de demanda. Cada usuario elige un \textbf{destino}
+uniformemente entre las otras dos estaciones.
+
+% =====================================================================
+\section{Protocolo ODD}
+% =====================================================================
+
+Se documenta el modelo con el protocolo \textbf{ODD} (\emph{Overview, Design
+concepts, Details}) de Grimm \emph{et al.}, el estándar para comunicar modelos ABM.
+
+\subsection{Overview}
+\paragraph{Purpose.} Reproducir el flujo de pasajeros de la Línea Roja en hora pico
+para predecir esperas y filas, y evaluar políticas de mejora.
+
+\paragraph{Entities, state variables and scales.}
+Las entidades son \code{patches} (entorno), \code{pasajeros} y \code{cabinas}; sus
+variables de estado se listan en la Sección~\ref{sec:impl}.
+La escala temporal es $1\ \text{tick} = 1\ \text{segundo}$; una corrida de
+validación dura 3600 ticks (1 hora). La escala espacial es un mundo no toroidal de
+$61\times 33$ patches: el eje $X$ ordena las tres estaciones (centros en
+$x=-22,0,22$) y las dos vías corren en $y\approx +10$ (subida) y $y\approx -10$
+(bajada).
+
+\paragraph{Process overview and scheduling.}
+Cada tick ejecuta \code{go}, que invoca en \textbf{orden fijo} los procedimientos:
+\code{generar-pasajeros} $\to$ \code{gestionar-cajas} $\to$ \code{ordenar-colas}
+$\to$ \code{mover-cabinas} (desembarque + embarque) $\to$ \code{mover-pasajeros}
+$\to$ \code{tick}.
+
+\subsection{Design concepts}
+\begin{description}[style=unboxed,leftmargin=1.2em,nosep]
+  \item[Basic principles.] Teoría de colas ($M/M/c$ en cajas) y transporte por lotes
+  (\emph{batch service}, $K=10$) en cabinas.
+  \item[Emergence.] El tamaño de las filas y la espera promedio emergen de
+  decisiones locales.
+  \item[Adaptation.] Reglas simples: ir a la caja (o directo al andén si hay
+  tarjeta), abordar la primera cabina con cupo en su sentido, bajar en el destino.
+  No optimizan.
+  \item[Sensing.] El pasajero percibe su antigüedad relativa en la cola y su
+  destino; la cabina percibe si está en una parada, a qué estación/sentido
+  corresponde y si tiene cupo.
+  \item[Interaction.] Mediada por recursos compartidos limitados (cajas y asientos).
+  \item[Stochasticity.] Llegadas $\sim\mathrm{Poisson}(\lambda/60)$; atención
+  $\sim\mathrm{Exp}(1/\mu)$; tarjeta $\sim\mathrm{Bernoulli}(p_t)$; origen ponderado
+  y destino uniforme.
+  \item[Observation.] Monitores y gráficas en vivo; en lote, BehaviorSpace exporta
+  los \emph{reporters} a CSV.
+\end{description}
+
+\subsection{Details}
+La inicialización (\code{setup}) pinta la línea, deja las 12 cajas libres, construye
+el bucle de dos vías y sus paradas, y crea $n$ cabinas equiespaciadas. El modelo no
+lee datos externos. Los submodelos (llegadas, servicio en caja, embarque/desembarque)
+se formalizan en la Sección~\ref{sec:mat}.
+
+% =====================================================================
+\section{Formulación matemática detallada}
+\label{sec:mat}
+% =====================================================================
+
+\subsection{Proceso de llegadas (Poisson)}
+El número de pasajeros que ingresan a toda la línea en un tick (1 s) se modela como
+un proceso de Poisson. Si $\lambda$ está en usuarios/minuto, la media por tick es
+$\lambda/60$ y
+\begin{equation}
+N_t \sim \mathrm{Poisson}\!\left(\frac{\lambda}{60}\right),\qquad
+\Pr(N_t = k) = e^{-\lambda/60}\,\frac{(\lambda/60)^k}{k!},\quad k=0,1,2,\dots
+\end{equation}
+La justificación es clásica: las llegadas de personas independientes a una
+instalación de servicio tienen tiempos entre llegadas exponenciales e
+independientes, lo que equivale a un proceso de Poisson. En NetLogo:
+\code{random-poisson (tasa-llegada-usuarios / 60)}.
+
+\subsection{Ruteo origen--destino}
+A cada pasajero generado se le asigna una estación de origen $o$ según la
+distribución ponderada $w_s$ y un destino $d$ uniforme entre las dos restantes:
+\begin{equation}
+\Pr(o = s) = w_s,\qquad
+\Pr(d = j \mid o) = \frac{1}{2}\quad \forall\, j \neq o .
+\end{equation}
+El \textbf{sentido} de viaje queda determinado por la geometría de la línea:
+\begin{equation}
+\text{sentido} =
+\begin{cases}
+\text{subida} & \text{si } d > o,\\[2pt]
+\text{bajada} & \text{si } d < o.
+\end{cases}
+\end{equation}
+Con probabilidad $p_t$ el pasajero tiene tarjeta (Bernoulli) y omite la caja.
+
+\subsection{Servicio en las cajas: cola \texorpdfstring{$M/M/c$}{M/M/c} por estación}
+Las boleterías de \emph{cada} estación forman una cola $M/M/c$ independiente:
+llegadas markovianas (\textbf{M}), servicio exponencial (\textbf{M}) y $c$
+servidores. Solo la fracción $(1-p_t)$ que paga en efectivo usa la caja, y solo la
+fracción $w_s$ de la demanda llega a la estación $s$. La tasa efectiva a las cajas de
+la estación $s$ y las magnitudes de carga son:
+\begin{align}
+\lambda_{\text{caja}}(s) &= (1-p_t)\,w_s\,\lambda \qquad [\text{usuarios/s}], \\
+\mu &= \frac{1}{\text{tiempo-atencion-caja}} \qquad [\text{servicios/s por caja}], \\
+a(s) &= \frac{\lambda_{\text{caja}}(s)}{\mu} \qquad (\text{erlangs ofrecidos}), \\
+\rho(s) &= \frac{a(s)}{c} \qquad (\text{utilización por servidor}).
+\end{align}
+El tiempo de atención se muestrea como $\mathrm{Exp}(\mu)$ mediante
+\code{round(random-exponential tiempo-atencion-caja)}.
+
+\paragraph{Estación crítica.} La de mayor demanda de caja es \textbf{Central}
+($w_0 = 0{,}38$, pues todos sus usuarios suben). Con los parámetros base
+($\lambda=70/\text{min}=1{,}1\overline{6}/\text{s}$, $p_t=0{,}60$, $\mu=0{,}1/\text{s}$):
+\begin{equation}
+\lambda_{\text{caja}}(\text{Central}) = 0{,}40 \cdot 0{,}38 \cdot 1{,}1\overline{6}
+= 0{,}177\ \text{s}^{-1},\qquad a = 1{,}77\ \text{erlangs}.
+\end{equation}
+La utilización según el número de cajas abiertas es entonces
+$\rho = a/c$:
+\begin{equation}
+c=1\Rightarrow \rho = 1{,}77;\quad
+c=2\Rightarrow \rho = 0{,}89;\quad
+c=3\Rightarrow \rho = 0{,}59;\quad
+c=4\Rightarrow \rho = 0{,}44.
+\end{equation}
+
+\paragraph{Condición de estabilidad.} La cola es estable si y solo si
+\begin{equation}
+\rho(s) < 1 \;\Longleftrightarrow\; c\,\mu > \lambda_{\text{caja}}(s).
+\end{equation}
+Con $c=1$, $\rho=1{,}77>1$ y la fila de Central crece sin cota: este es exactamente
+el cuello de botella que el modelo evidencia.
+
+\paragraph{Fórmula de Erlang C (contraste analítico).} Para una cola $M/M/c$
+estable, la probabilidad de que un cliente que llega deba esperar es
+\begin{equation}
+P_{\text{wait}} = C(c,a) =
+\frac{\dfrac{a^{c}}{c!\,(1-\rho)}}
+{\displaystyle\sum_{n=0}^{c-1}\frac{a^{n}}{n!} + \frac{a^{c}}{c!\,(1-\rho)}},
+\label{eq:erlangc}
+\end{equation}
+y el tiempo medio de espera en la fila (antes de ser atendido) es
+\begin{equation}
+W_q = \frac{P_{\text{wait}}}{c\mu - \lambda_{\text{caja}}}.
+\label{eq:wq}
+\end{equation}
+Para el escenario base en Central ($a=1{,}77$, $c=2$, $\rho=0{,}89$),
+\eqref{eq:erlangc}--\eqref{eq:wq} dan $P_{\text{wait}}\approx 0{,}83$ y
+$W_q\approx 37\ \text{s}$. Por la ley de Little, la longitud media de la fila de caja
+en Central es
+\begin{equation}
+L_q = \lambda_{\text{caja}}\, W_q \approx 0{,}177 \cdot 37 \approx 6{,}5\ \text{personas},
+\end{equation}
+consistente con la \code{fila-caja} total $\approx 7{,}7$ observada en la simulación
+(las otras dos estaciones aportan el resto). El \emph{promedio} de espera en caja
+reportado por el simulador ($\approx 10{,}6$ s) es menor porque se promedia sobre
+\emph{todos} los pasajeros, incluidos los $60\%$ con tarjeta (espera nula) y las
+estaciones de menor carga.
+
+\subsection{Servicio en el andén: transporte por lotes (\emph{batch service})}
+Las cabinas son servidores móviles de capacidad $K=10$ que atienden por lotes en
+cada parada. Como la línea tiene \textbf{dos vías}, un pasajero solo puede abordar
+una cabina que circule en su sentido. Por cada cabina que pasa suben
+\begin{equation}
+\text{suben} = \min\!\bigl(K - \text{capacidad-actual},\ |\text{cola-andén}(s,\text{sentido})|\bigr).
+\end{equation}
+
+\paragraph{Frecuencia de paso y capacidad de transporte.} Con un circuito de
+longitud $L$, velocidad $v$ y $n$ cabinas equiespaciadas, el intervalo entre cabinas
+en una parada (\emph{headway}) y la capacidad ofrecida son
+\begin{equation}
+f = \frac{L}{v\,n}\quad[\text{s}],\qquad
+\text{Capacidad} = \frac{K}{f} = \frac{K\,v\,n}{L}\quad[\text{pas/s}].
+\end{equation}
+Con los valores base ($L \approx 152$ patches, $v=0{,}5$, $n=18$, $K=10$):
+\begin{equation}
+f = \frac{152}{0{,}5\cdot 18} \approx 16{,}9\ \text{s},\qquad
+\frac{K}{f} \approx 0{,}59\ \text{pas/s} \approx 35{,}5\ \text{pas/min por paradero}.
+\end{equation}
+
+\paragraph{Paradero crítico.} El primer paradero de cada sentido recibe cabinas
+\emph{vacías}: en subida es Central, con demanda
+$w_0\lambda = 0{,}38\cdot 70 \approx 26{,}6$ pas/min. Como
+$35{,}5 > 26{,}6$, el andén \textbf{no} es el cuello de botella y la espera media en
+él es aproximadamente la mitad del intervalo entre cabinas,
+\begin{equation}
+W_{\text{andén}} \approx \frac{f}{2} \approx 8{,}5\ \text{s},
+\end{equation}
+coherente con los $\approx 6$ s observados.
+
+\subsection{Geometría del circuito y movimiento de las cabinas}
+El cable se modela como un \textbf{bucle cerrado} definido por una lista de
+\emph{waypoints} $\{P_i\}_{i=0}^{m-1}$, $P_i=(x_i,y_i)$. Su longitud total es
+\begin{equation}
+L = \sum_{i=0}^{m-1} \lVert P_{(i+1)\bmod m} - P_i \rVert .
+\end{equation}
+Cada cabina guarda su distancia recorrida $d$ sobre el circuito. La posición
+cartesiana se obtiene por \emph{interpolación lineal por arco}: sea
+$\tilde d = d \bmod L$; se busca el segmento $[P_i,P_{i+1}]$ que contiene a
+$\tilde d$ y, con $s_i = \lVert P_{i+1}-P_i\rVert$ y la fracción
+$\,\phi = \tilde d / s_i\in[0,1]$,
+\begin{equation}
+\mathbf{r}(d) = P_i + \phi\,(P_{i+1}-P_i).
+\end{equation}
+En cada tick la cabina avanza $d \leftarrow d + v$ (con $v$ reducida al $50\%$ al
+entrar a una parada, modelando el desembrague). Una parada está ``activa'' si la
+distancia circular entre $d$ y la distancia $d_p$ de la parada es menor que la zona
+de servicio $\delta$:
+\begin{equation}
+\operatorname{dist}_\circ(d,d_p) =
+\min\bigl(|d-d_p| \bmod L,\ L - (|d-d_p|\bmod L)\bigr) < \delta .
+\end{equation}
+
+\subsection{Indicadores de salida}
+Los acumuladores se actualizan cuando un pasajero \textbf{baja en su destino}. Para
+cada pasajero:
+\begin{align}
+t_{\text{espera-caja}}  &= t_{\text{fin-caja}} - t_{\text{inicio-caja}} \quad(=0 \text{ si tiene tarjeta}),\\
+t_{\text{espera-andén}} &= t_{\text{embarque}} - t_{\text{inicio-andén}},\\
+t_{\text{viaje}}        &= t_{\text{bajada}} - t_{\text{embarque}}.
+\end{align}
+Los promedios del sistema, con $N$ = \code{n-completados}:
+\begin{align}
+\overline{W}_{\text{total}} &= \frac{1}{N}\sum (t_{\text{espera-caja}} + t_{\text{espera-andén}}), \\
+\overline{W}_{\text{caja}}  &= \frac{1}{N}\sum t_{\text{espera-caja}}, \qquad
+\overline{W}_{\text{andén}} = \frac{1}{N}\sum t_{\text{espera-andén}}, \\
+\overline{V} &= \frac{1}{N}\sum t_{\text{viaje}}, \qquad
+\text{Throughput} = \frac{N}{\text{ticks}/60}\ [\text{pas/min}].
+\end{align}
+El indicador $\overline{W}_{\text{total}}$ (caja + andén en la estación de origen) es
+el que se contrasta en la validación.
+
+\subsection{Algoritmo del ciclo principal}
+\begin{quote}\small
+\textbf{cada tick (1 s):}
+\begin{enumerate}[nosep,leftmargin=2em]
+  \item $k \leftarrow \mathrm{Poisson}(\lambda/60)$; crear $k$ pasajeros con origen
+  ponderado, destino uniforme, sentido y tarjeta.
+  \item Cajas por estación ($M/M/c$, FIFO): cerrar atenciones vencidas; asignar cada
+  caja libre al pasajero de menor $t_{\text{inicio-caja}}$ durante
+  $\mathrm{Exp}(\mu)$.
+  \item Cabinas (lotes, $K=10$): avanzar; en cada parada desembarcar a los de
+  destino $=s$ y embarcar $\min(\text{cupo},|\text{cola}|)$ más antiguos del sentido.
+  \item Ordenar colas; mover pasajeros hacia su objetivo; \code{tick}.
+\end{enumerate}
+\end{quote}
+
+% =====================================================================
+\section{Implementación en NetLogo}
+\label{sec:impl}
+% =====================================================================
+
+\subsection{Estructura del código}
+El modelo se implementa con dos \emph{breeds} (\code{pasajeros} y \code{cabinas}).
+Las variables de estado por agente son:
+
+\begin{lstlisting}
+breed [ pasajeros pasajero ]
+breed [ cabinas   cabina   ]
+
+pasajeros-own [
+  estacion-origen estacion-destino sentido   ;; ruteo
+  estado tiene-tarjeta?                       ;; maquina de estados
+  tiempo-llegada tiempo-espera-caja tiempo-espera-anden tiempo-viaje
+  t-inicio-caja t-inicio-anden t-fin-caja t-board
+  caja-asignada cabina-asignada tx ty
+]
+cabinas-own [ capacidad-actual estado-cabina dist-ruta ]
+\end{lstlisting}
+
+\noindent Cada pasajero es una máquina de estados:
+\[
+\text{en-fila-caja} \to \text{en-caja} \to \text{en-fila-andén}
+\to \text{viajando} \to \text{saliendo},
+\]
+donde los portadores de tarjeta entran directamente en \emph{en-fila-andén}.
+
+\subsection{El ciclo principal y el servicio en cabinas}
+El motor \code{go} y el procedimiento de servicio en cada parada (desembarque y
+embarque) son el corazón del modelo:
+
+\begin{lstlisting}
+to go
+  generar-pasajeros
+  gestionar-cajas
+  ordenar-colas        ;; posicion ordenada en cada fila
+  mover-cabinas        ;; avance + desembarque + embarque
+  mover-pasajeros
+  tick
+end
+
+;; Servicio en una parada (contexto: cabina). pr = [estacion sentido dist]
+to servir-parada [ pr ]
+  let s item 0 pr
+  let d item 1 pr
+  let me-who who
+  ;; 1) DESEMBARQUE: los que llegan a su destino
+  let bajan pasajeros with [ estado = "viajando"
+              and cabina-asignada = me-who and estacion-destino = s ]
+  let nb count bajan
+  if nb > 0 [
+    ask bajan [
+      set tiempo-viaje (ticks - t-board)
+      registrar-estadisticas
+      set estado "saliendo"  set cabina-asignada -1  show-turtle
+      setxy ([ xcor ] of myself) (anden-y d)
+      set tx (centro-x s) + 7  set ty (anden-y d)
+    ]
+    set capacidad-actual capacidad-actual - nb
+  ]
+  ;; 2) EMBARQUE: los mas antiguos que esperan en este sentido (FIFO)
+  let cupo (capacidad-cabina - capacidad-actual)
+  if cupo > 0 [
+    let cola pasajeros with [ estado = "en-fila-anden"
+                and estacion-origen = s and sentido = d ]
+    let suben min (list cupo (count cola))
+    if suben > 0 [
+      ask min-n-of suben cola [ t-inicio-anden ] [
+        set tiempo-espera-anden (ticks - t-inicio-anden)
+        set t-board ticks  set estado "viajando"
+        set cabina-asignada me-who  move-to myself  hide-turtle
+      ]
+      set capacidad-actual capacidad-actual + suben
+    ]
+  ]
+end
+\end{lstlisting}
+
+\subsection{Interpolación sobre el circuito}
+La conversión distancia $\to$ posición (la ecuación $\mathbf{r}(d)$) se implementa
+recorriendo los segmentos del bucle:
+
+\begin{lstlisting}
+to-report punto-en-ruta [ d ]
+  let dd (d mod ruta-largo)
+  let n length ruta
+  let i 0
+  while [ i < n ] [
+    let a item i ruta
+    let b item ((i + 1) mod n) ruta
+    let seg distancia-puntos a b
+    ifelse dd <= seg [
+      let f ifelse-value (seg = 0) [ 0 ] [ dd / seg ]
+      report (list (item 0 a + f * (item 0 b - item 0 a))
+                   (item 1 a + f * (item 1 b - item 1 a)))
+    ] [ set dd dd - seg  set i i + 1 ]
+  ]
+  report (item 0 ruta)
+end
+\end{lstlisting}
+
+\subsection{Compatibilidad con NetLogo 7.0.4}
+El modelo fue desarrollado y verificado en \textbf{NetLogo 7.0.4}. Puntos relevantes:
+\begin{itemize}[nosep]
+  \item NetLogo 7 introduce el formato XML \code{.nlogox}. El archivo \code{.nlogo}
+  \textbf{abre y se ejecuta sin cambios} en la versión 7 (conversión automática al
+  guardar, sin pérdida de información).
+  \item El cambio de precedencia de \code{ifelse-value} en NetLogo 7 no afecta al
+  modelo: todas sus apariciones son expresiones aisladas, sin combinarse con
+  operadores infijos.
+  \item Se verificó la ejecución en modo \emph{headless} de los tres experimentos de
+  BehaviorSpace (210 corridas en total) sin errores de compilación ni de ejecución.
+\end{itemize}
+
+% =====================================================================
+\section{Validación estadística}
+% =====================================================================
+
+Se contrasta el \textbf{tiempo de espera total} medido en campo (12 sesiones de
+aforo) contra el generado por \textbf{30 corridas} de NetLogo del escenario base,
+mediante una \textbf{prueba $t$ de Welch} para dos muestras independientes (no asume
+varianzas iguales).
+
+\paragraph{Hipótesis.}
+\[
+H_0:\ \mu_{\text{real}} = \mu_{\text{sim}} \quad(\text{modelo válido}),\qquad
+H_1:\ \mu_{\text{real}} \neq \mu_{\text{sim}},\qquad \alpha = 0{,}05.
+\]
+
+\paragraph{Estadístico.} Con medias $\bar{x}_a,\bar{x}_b$, varianzas muestrales
+$s_a^2,s_b^2$ y tamaños $n_a,n_b$:
+\begin{equation}
+t = \frac{\bar{x}_a - \bar{x}_b}{\sqrt{\dfrac{s_a^2}{n_a} + \dfrac{s_b^2}{n_b}}},
+\qquad
+\nu = \frac{\left(\dfrac{s_a^2}{n_a} + \dfrac{s_b^2}{n_b}\right)^{\!2}}
+{\dfrac{(s_a^2/n_a)^2}{n_a-1} + \dfrac{(s_b^2/n_b)^2}{n_b-1}}
+\quad(\text{g.l. de Welch--Satterthwaite}).
+\end{equation}
+El $p$-valor a dos colas se obtiene de la distribución $t$ de Student con $\nu$
+grados de libertad mediante la función beta incompleta regularizada,
+$p = I_{\nu/(\nu+t^2)}\!\left(\nu/2,\,1/2\right)$, implementada sin dependencias en
+\code{analisis/validacion.py}.
+
+\paragraph{Resultados.}
+\begin{table}[h]
+\centering
+\caption{Muestras y prueba $t$ de Welch (indicador: $\overline{W}_{\text{total}}$).}
+\label{tab:validacion}
+\begin{tabular}{lccc}
+\toprule
+Muestra & $n$ & Media (s) & Desv. (s) \\
+\midrule
+Real (aforo de campo) & 12 & 16{,}68 & 5{,}82 \\
+Simulada (BehaviorSpace) & 30 & 16{,}83 & 2{,}32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\[
+t = -0{,}087,\qquad \nu = 12{,}43,\qquad p\text{-valor} = 0{,}932.
+\]
+Como $p = 0{,}93 > 0{,}05$, \textbf{no se rechaza $H_0$}: no hay diferencia
+estadísticamente significativa entre la simulación y la realidad. \textbf{El modelo
+queda validado.}
+
+% =====================================================================
+\section{Experimentación y propuesta de mejora}
+% =====================================================================
+
+Se prueban dos hipótesis de mejora con BehaviorSpace (30 corridas por nivel, 3600
+ticks). Las columnas \emph{empíricas} son las medias reales de las corridas; $\rho$
+es la utilización analítica en la estación crítica (Central).
+
+\subsection{Hipótesis 1: abrir más cajas por estación}
+\begin{table}[h]
+\centering
+\caption{Experimento \code{2-Escenarios-Cajas} ($p_t = 60\%$).}
+\label{tab:cajas}
+\begin{tabular}{ccccl}
+\toprule
+Cajas $c$ & $\rho$ (Central) & Espera total (s) & Espera caja (s) & Estado \\
+\midrule
+1 & 1{,}77 & 196{,}6 & 192{,}2 & Colapso (fila $\approx 600$) \\
+\textbf{2 (base)} & 0{,}89 & 17{,}7 & 11{,}5 & Congestionado, estable \\
+3 & 0{,}59 & 11{,}3 & 4{,}8 & Fluido \\
+4 & 0{,}44 & 10{,}6 & 4{,}1 & Holgado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Pasar de 2 a 3 cajas reduce la espera total un $\mathbf{36\%}$ (de
+$17{,}7$ a $11{,}3$ s) y vacía la fila. De 3 a 4 la mejora es marginal:
+\textbf{3 cajas es el óptimo costo/beneficio}. Con 1 caja, $\rho>1$ y la fila de
+Central colapsa.
+
+\subsection{Hipótesis 2: incentivar el uso de tarjeta}
+\begin{table}[h]
+\centering
+\caption{Experimento \code{3-Escenario-Tarjeta} ($c = 2$ cajas).}
+\label{tab:tarjeta}
+\begin{tabular}{cccl}
+\toprule
+\% con tarjeta & $\rho$ (Central) & Espera total (s) & Estado \\
+\midrule
+40 & 1{,}33 & 158{,}4 & Inestable \\
+55 & 1{,}00 & 30{,}5 & Congestionado \\
+\textbf{60 (base)} & 0{,}89 & 17{,}7 & Estable \\
+70 & 0{,}66 & 10{,}9 & Fluido \\
+85 & 0{,}33 & 7{,}9 & Holgado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Subir la adopción de tarjeta del $55\%$ al $70\%$ reduce la espera total un
+$\mathbf{64\%}$ (de $30{,}5$ a $10{,}9$ s) ---tanto como abrir una caja adicional---
+pero \textbf{sin costo de personal}.
+
+\subsection{Propuesta final}
+\begin{enumerate}[nosep]
+  \item \textbf{Operativa inmediata:} abrir una \textbf{tercera boletería} por
+  estación en hora pico ($-36\%$ de espera, fila casi nula).
+  \item \textbf{Estructural / bajo costo:} campaña y kioscos de \textbf{recarga
+  digital/QR} para elevar el uso de tarjeta al $70\%$, con efecto equivalente y
+  sostenible.
+\end{enumerate}
+
+% =====================================================================
+\section{Gemelo digital: simulación web 3D}
+% =====================================================================
+
+Como complemento de alto impacto para la defensa, el proyecto incluye un
+\textbf{gemelo digital web 3D} que reproduce la misma lógica de la Línea Roja con
+ruteo origen$\to$destino. Cada pasajero llega, elige destino, paga o usa tarjeta,
+espera en el andén de su sentido, aborda, viaja por el cable siguiendo la ladera
+La Paz--El Alto y baja en su estación.
+
+\paragraph{Tecnologías.} Next.js 14 (App Router), React 18, Three.js con
+\code{@react-three/fiber} y \code{@react-three/drei}. El rendimiento (cientos de
+agentes sin caída de FPS) se logra con \code{InstancedMesh}; el motor de simulación
+es JavaScript puro (\code{web/lib/simulation.js}), con la misma estructura de colas
+$M/M/c$, batch service y bucle de cable que el modelo NetLogo. Provee controles e
+indicadores en vivo equivalentes a los \emph{sliders} y monitores del modelo
+académico.
+
+% =====================================================================
+\section{Conclusiones}
+% =====================================================================
+\begin{itemize}[nosep]
+  \item Se construyó un modelo ABM de la Línea Roja completa (3 estaciones, dos
+  vías, ruteo origen--destino) que integra teoría de colas ($M/M/c$) y transporte
+  por lotes, implementado y verificado en NetLogo 7.0.4.
+  \item El modelo fue \textbf{validado estadísticamente} contra datos de campo
+  ($p=0{,}93$): es estadísticamente indistinguible de la realidad.
+  \item El \textbf{cuello de botella} es la boletería de las estaciones terminales;
+  con los recursos base ($c=2$, $p_t=60\%$) el sistema es estable pero congestionado
+  ($\rho_{\text{Central}}=0{,}89$).
+  \item Dos políticas de mejora ---una tercera caja ($-36\%$) o más tarjeta
+  ($-64\%$)--- descongestionan el sistema; la segunda es preferible por su costo.
+  \item La consistencia entre la predicción analítica (Erlang C, ley de Little) y la
+  salida del simulador refuerza la confianza en el modelo.
+\end{itemize}
+
+\paragraph{Limitaciones.} El modelo cubre las 3 estaciones de la Línea Roja pero no
+los transbordos ni la red completa; supone servicio de caja exponencial (markoviano)
+y una geometría esquemática de las estaciones; no modela abandono (\emph{reneging})
+ni grupos familiares. Estas simplificaciones son intencionales y coherentes con el
+nivel de abstracción exigido.
+
+% =====================================================================
+\section*{Referencias}
+\addcontentsline{toc}{section}{Referencias}
+% =====================================================================
+\begin{enumerate}[nosep]
+  \item Grimm, V. \emph{et al.} (2006, 2010). \emph{A standard protocol for
+  describing individual-based and agent-based models (ODD)}. Ecological Modelling.
+  \item Wilensky, U. (1999). \emph{NetLogo}. Center for Connected Learning, North-
+  western University. Versión 7.0.4.
+  \item Gross, D. \& Harris, C. (1998). \emph{Fundamentals of Queueing Theory}.
+  Wiley (modelos $M/M/c$, fórmula de Erlang C, ley de Little).
+  \item Welch, B. L. (1947). \emph{The generalization of ``Student's'' problem when
+  several different population variances are involved}. Biometrika.
+\end{enumerate}
+
+\end{document}

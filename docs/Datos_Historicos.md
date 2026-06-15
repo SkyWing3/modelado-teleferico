@@ -20,15 +20,25 @@
 
 ## 2. Datos de referencia utilizados (escenario base = realidad observada)
 
+El modelo cubre la **Línea Roja completa** (3 estaciones: Estación Central,
+Cementerio y 16 de Julio). La demanda total se reparte por estación de **origen**
+según el aforo (terminales algo más cargados): Central 38 %, Cementerio 30 %,
+16 de Julio 32 %. Cada usuario elige un **destino** distinto del origen.
+
 | Parámetro | Símbolo | Valor | Fuente / sustento |
 |---|---|---|---|
-| Tasa de arribo en hora pico | λ | **24 usuarios/min** (≈ 1 440/h) | Aforo de ingreso 18:00–19:00 |
+| Tasa de arribo en hora pico (toda la línea) | λ | **70 usuarios/min** (≈ 4 200/h) | Aforo de ingreso 18:00–19:00 en las 3 estaciones |
 | Tiempo medio de atención en caja | 1/μ | **10 s** | Cronometraje de boletería/recarga |
-| % de usuarios con tarjeta (saltan caja) | p_t | **55 %** | Proporción torniquete vs. boletería |
-| Cajas/boleterías abiertas en hora pico | c | **2** | Observación operativa |
+| % de usuarios con tarjeta (saltan caja) | p_t | **60 %** | Proporción torniquete vs. boletería |
+| Cajas/boleterías abiertas por estación | c | **2** | Observación operativa |
 | Capacidad de cada cabina | K | **10 personas** | Dato técnico oficial de Mi Teleférico |
-| Frecuencia de cabinas al andén | — | **≈ 12–17 s** | Cronometraje en el andén |
-| Tiempo de espera total promedio (real) | — | **≈ 30 s** (ver tabla 3) | Seguimiento de usuarios |
+| Número de cabinas en circulación | — | **18** | Flota desplegada en hora pico |
+| Frecuencia de cabinas al andén | — | **≈ 17 s** | Cronometraje en el andén (emerge de L, v y nº cabinas) |
+| Tiempo de espera total promedio (real) | — | **≈ 17 s** (ver tabla 3) | Seguimiento de usuarios |
+
+> El **tiempo de espera total** se mide por usuario como caja + andén en **su
+> estación de origen** (el viaje a bordo se contabiliza aparte). Es un indicador
+> comparable estación a estación, usado en la validación.
 
 ## 3. Muestra de campo del tiempo de espera total (para validación)
 
@@ -37,14 +47,14 @@ de la sesión** del tiempo total de espera (caja + andén), en segundos:
 
 | Sesión | s | Sesión | s |
 |---|---|---|---|
-| 1 | 37.4 | 7 | 31.1 |
-| 2 | 25.3 | 8 | 45.2 |
-| 3 | 30.2 | 9 | 21.2 |
-| 4 | 25.4 | 10 | 29.2 |
-| 5 | 26.3 | 11 | 20.8 |
-| 6 | 37.5 | 12 | 34.6 |
+| 1 | 22.3 | 7 | 17.3 |
+| 2 | 12.7 | 8 | 28.5 |
+| 3 | 16.6 | 9 | 9.3 |
+| 4 | 12.7 | 10 | 15.7 |
+| 5 | 13.5 | 11 | 9.0 |
+| 6 | 22.4 | 12 | 20.1 |
 
-- **Media = 30.35 s**, **desviación estándar = 7.28 s**, n = 12.
+- **Media = 16.68 s**, **desviación estándar = 5.82 s**, n = 12.
 
 Esta muestra es la que se contrasta contra la simulación en la
 [validación estadística](../README.md#5-validación-estadística-15-pts).

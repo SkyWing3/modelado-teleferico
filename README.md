@@ -4,11 +4,13 @@ Proyecto final de la materia **Modelado, Dinámica de Sistemas y Simulación (SI
 Simula el flujo de pasajeros de **Mi Teleférico** (La Paz – El Alto, Bolivia) mediante
 **Modelado Basado en Agentes (ABM)** y entrega dos productos complementarios:
 
-1. **Modelo académico en NetLogo** — una estación modelada como sistema de colas,
-   **validado estadísticamente** con datos de campo (prueba t, BehaviorSpace).
-2. **Simulación web 3D** — la **Línea Roja completa** (3 estaciones reales) en
-   3D interactivo, donde cada pasajero elige su destino, viaja por el cable y se
-   baja en su estación. Hecha con **Next.js + React Three Fiber (Three.js)**.
+1. **Modelo académico en NetLogo** — la **Línea Roja completa** (3 estaciones
+   reales) modelada como sistema de colas con ruteo origen→destino, **validado
+   estadísticamente** con datos de campo (prueba t, BehaviorSpace). Compatible
+   con **NetLogo 7.0.4**.
+2. **Simulación web 3D** — la misma **Línea Roja** en 3D interactivo, donde cada
+   pasajero elige su destino, viaja por el cable y se baja en su estación. Hecha
+   con **Next.js + React Three Fiber (Three.js)**.
 
 | | |
 |---|---|
@@ -82,25 +84,27 @@ lotes es un caso ideal de **Modelado Basado en Agentes (ABM)**.
 ## 3. Abstracción del sistema
 
 El modelo es una **simplificación**: incluye sólo los componentes que gobiernan la
-espera. Se estructura en tres tipos de componentes (ABM):
+espera y el viaje. Cubre la **Línea Roja** (Estación Central, Cementerio y 16 de
+Julio) con dos vías (subida/bajada) y ruteo origen→destino. Se estructura en tres
+tipos de componentes (ABM):
 
 | Componente | Representación | Rol |
 |---|---|---|
-| **Entorno** | `patches` coloreados por zona | Ingreso (verde), Cajas (azul), Andén (amarillo), Ruta del cable (gris) |
-| **Pasajeros** | `breed pasajeros` | Agentes que llegan, hacen fila, son atendidos y embarcan |
-| **Cabinas** | `breed cabinas` | Servidores móviles de capacidad 10 que circulan por el cable |
+| **Entorno** | `patches` coloreados | Ladera, planta de cada estación, andenes de subida/bajada y las dos vías del cable |
+| **Pasajeros** | `breed pasajeros` | Agentes con origen/destino que llegan, hacen fila, son atendidos, embarcan, viajan y bajan en su estación |
+| **Cabinas** | `breed cabinas` | Servidores móviles de capacidad 10 que circulan por el bucle de dos vías |
 
 **Clasificación de variables:**
 
-- **Entrada (parámetros / sliders):** `tasa-llegada-usuarios`,
-  `cantidad-cajas-abiertas`, `tiempo-atencion-caja`, `prob-tarjeta`,
+- **Entrada (parámetros / sliders):** `tasa-llegada-usuarios` (toda la línea),
+  `cantidad-cajas-abiertas` (por estación), `tiempo-atencion-caja`, `prob-tarjeta`,
   `numero-cabinas`, `velocidad-cabinas`.
-- **Estado:** por pasajero (`estado`, `tiempo-llegada`, `tiene-tarjeta?`, …), por
-  cabina (`capacidad-actual`, `estado-cabina`, `dist-ruta`) y del sistema
-  (`fila-caja`, `fila-anden`, acumuladores).
+- **Estado:** por pasajero (`estacion-origen`, `estacion-destino`, `sentido`,
+  `estado`, `tiene-tarjeta?`, …), por cabina (`capacidad-actual`, `estado-cabina`,
+  `dist-ruta`) y del sistema (acumuladores de espera, viaje y throughput).
 - **Salida:** `espera-promedio-total`, `espera-promedio-caja`,
-  `espera-promedio-anden`, `fila-caja`, `fila-anden`, `n-completados`,
-  `throughput-por-min`.
+  `espera-promedio-anden`, `viaje-promedio`, `fila-caja`, `fila-anden`,
+  `cola-estacion`, `pasajeros-en-transito`, `n-completados`, `throughput-por-min`.
 
 El detalle completo está en [`docs/Protocolo_ODD.md`](docs/Protocolo_ODD.md).
 
@@ -113,12 +117,13 @@ Valores de referencia (escenario base = realidad):
 
 | Parámetro | Valor |
 |---|---|
-| Tasa de arribo (λ) | 24 usuarios/min |
+| Tasa de arribo (λ, toda la línea) | 70 usuarios/min |
 | Tiempo medio de atención en caja (1/μ) | 10 s |
-| % de usuarios con tarjeta (saltan la caja) | 55 % |
-| Cajas abiertas en hora pico (c) | 2 |
+| % de usuarios con tarjeta (saltan la caja) | 60 % |
+| Cajas abiertas por estación (c) | 2 |
 | Capacidad de cabina (K) | 10 personas |
-| Espera total promedio real | ≈ 30 s |
+| Cabinas en circulación | 18 |
+| Espera total promedio real | ≈ 17 s |
 
 Metodología de medición, muestra de 12 sesiones y fuentes:
 [`docs/Datos_Historicos.md`](docs/Datos_Historicos.md).
@@ -143,9 +148,10 @@ Derivaciones (incluida la fórmula de Erlang C usada como contraste analítico) 
 [`docs/Ecuaciones_y_Algoritmos.md`](docs/Ecuaciones_y_Algoritmos.md).
 
 ### Implementación
-NetLogo, con código comentado en `modelo/MiTeleferico.nlogo`. El bucle `go` ejecuta,
-por tick (1 tick = 1 s): `generar-pasajeros → gestionar-cajas → ordenar-colas →
-mover-cabinas (embarque) → mover-pasajeros → tick`.
+NetLogo **7.0.4**, con código comentado en `modelo/MiTeleferico.nlogo`. El bucle
+`go` ejecuta, por tick (1 tick = 1 s): `generar-pasajeros (origen→destino) →
+gestionar-cajas (por estación) → ordenar-colas → mover-cabinas (desembarque +
+embarque) → mover-pasajeros → tick`.
 
 ---
 
@@ -162,17 +168,18 @@ Resultado (`analisis/salida_validacion.txt`, reproducible con `validacion.py`):
 
 | Muestra | n | Media (s) | Desv. (s) |
 |---|---|---|---|
-| Real | 12 | 30.35 | 7.28 |
-| Simulada | 30 | 30.19 | 5.05 |
+| Real | 12 | 16.68 | 5.82 |
+| Simulada | 30 | 16.83 | 2.32 |
 
 ```
-Estadístico t = 0.0713   gl = 15.43   p-valor = 0.944
-p = 0.944 > 0.05  →  NO se rechaza H0  →  MODELO VALIDADO
+Estadístico t = -0.0868   gl = 12.43   p-valor = 0.932
+p = 0.932 > 0.05  →  NO se rechaza H0  →  MODELO VALIDADO
 ```
 
-Como el p-valor (0.944) es mucho mayor que 0.05, **no hay diferencia
+Como el p-valor (0.932) es mucho mayor que 0.05, **no hay diferencia
 estadísticamente significativa** entre la simulación y la realidad: el modelo es
-confiable.
+confiable. El indicador comparado es `espera-promedio-total` (caja + andén en la
+estación de origen).
 
 > Los datos simulados de ejemplo (`datos_simulados_ejemplo.csv`) se reemplazan por
 > la salida real del experimento `1-Validacion-Baseline` de BehaviorSpace antes de
@@ -183,35 +190,39 @@ confiable.
 ## 7. Experimentación y propuesta de mejora
 
 Se plantean dos hipótesis de mejora y se prueban con BehaviorSpace (30 corridas
-cada nivel, 3600 ticks). Las **predicciones analíticas** (Erlang C) sirven de
-contraste; en la columna empírica se pegan las medias de BehaviorSpace.
+cada nivel, 3600 ticks, λ = 70/min, 18 cabinas). La columna **empírica** son las
+medias reales de BehaviorSpace; ρ es la utilización analítica en la estación
+crítica (Central).
 
-### Hipótesis 1 — Abrir más cajas (`2-Escenarios-Cajas`)
+### Hipótesis 1 — Abrir más cajas por estación (`2-Escenarios-Cajas`)
 
-| Cajas (c) | Utilización ρ | Espera total esperada | Estado |
+| Cajas (c) | Utilización ρ (Central) | Espera total (BehaviorSpace) | Estado |
 |---|---|---|---|
-| 1 | 1.80 | → ∞ (inestable) | Colapso de la fila |
-| **2 (base)** | 0.90 | ≈ 32 s | Congestionado |
-| 3 | 0.60 | ≈ 14 s | Fluido |
-| 4 | 0.45 | ≈ 13 s | Holgado |
+| 1 | 1.77 | ≈ 197 s (fila ~600) | Colapso (inestable) |
+| **2 (base)** | 0.89 | ≈ 18 s | Congestionado pero estable |
+| 3 | 0.59 | ≈ 11 s | Fluido |
+| 4 | 0.44 | ≈ 11 s | Holgado |
 
-**Abrir una tercera caja reduce la espera total ≈ 56 %** (de ~32 s a ~14 s). Pasar
-de 3 a 4 cajas casi no mejora: **3 cajas es el punto óptimo costo/beneficio**.
+**Abrir una tercera caja por estación reduce la espera total ≈ 36 %** (de ~18 s a
+~11 s) y vacía la fila. Pasar de 3 a 4 cajas casi no mejora: **3 cajas es el punto
+óptimo costo/beneficio**.
 
 ### Hipótesis 2 — Incentivar el uso de tarjeta (`3-Escenario-Tarjeta`)
 
-| % con tarjeta | λ a la caja | Espera total esperada |
+| % con tarjeta | ρ (Central) | Espera total (BehaviorSpace) |
 |---|---|---|
-| 40 % | 0.24/s (ρ=1.2) | inestable |
-| 55 % (base) | 0.18/s | ≈ 32 s |
-| 70 % | 0.12/s | ≈ 13 s |
-| 85 % | 0.06/s | ≈ 10 s |
+| 40 % | 1.33 | ≈ 158 s (inestable) |
+| 55 % | 1.00 | ≈ 31 s (congestionado) |
+| **60 % (base)** | 0.89 | ≈ 18 s |
+| 70 % | 0.66 | ≈ 11 s |
+| 85 % | 0.33 | ≈ 8 s |
 
-Subir la adopción de tarjeta del 55 % al 70 % descongestiona las cajas tanto como
-abrir una caja adicional, **sin costo de personal**.
+Subir la adopción de tarjeta del 55 % al 70 % reduce la espera total ≈ 64 %
+(de ~31 s a ~11 s) — tanto como abrir una caja adicional, **sin costo de personal**.
 
 ### Propuesta final
-1. **Operativa inmediata:** abrir una **tercera boletería** en hora pico (−56 % de espera).
+1. **Operativa inmediata:** abrir una **tercera boletería** por estación en hora
+   pico (−36 % de espera, fila casi nula).
 2. **Estructural / bajo costo:** campaña + kioscos de **recarga digital/QR** para
    subir el uso de tarjeta al 70 %, con efecto equivalente y sostenible.
 
@@ -246,9 +257,9 @@ de FPS) y un motor de simulación en JavaScript puro (`web/lib/simulation.js`).
 
 Documentación específica: [`web/README.md`](web/README.md).
 
-> El modelo NetLogo sigue siendo el **artefacto académico validado** (una estación,
-> teoría de colas, prueba t). La web es la **extensión de demostración** que lleva
-> ese sistema a la línea completa con ruteo origen–destino.
+> El modelo NetLogo es el **artefacto académico validado** (Línea Roja de 3
+> estaciones, teoría de colas, prueba t, BehaviorSpace). La web 3D es la **misma
+> lógica** llevada a un gemelo digital inmersivo para la defensa.
 
 ---
 
@@ -301,7 +312,7 @@ Proyecto final/
 
 | Herramienta | Versión | Para qué | Descarga |
 |---|---|---|---|
-| **NetLogo** (escritorio) | 6.2 o superior | abrir y correr el modelo y BehaviorSpace | <https://ccl.northwestern.edu/netlogo/> |
+| **NetLogo** (escritorio) | **7.0.4** (recomendada; abre también en 6.x) | abrir y correr el modelo y BehaviorSpace | <https://ccl.northwestern.edu/netlogo/> |
 | **Python** | 3.8 o superior | validación estadística (`validacion.py`) | <https://www.python.org/downloads/> |
 | **Node.js + npm** | Node 18.18+ | simulación web 3D | <https://nodejs.org/> |
 | **Git** | cualquiera | versionar / subir a GitHub (opcional) | <https://git-scm.com/> |
@@ -323,9 +334,10 @@ npm --version
 
 ### A) Modelo NetLogo (simulación + experimentos)
 
-1. Instala **NetLogo de escritorio** (6.2+).
+1. Instala **NetLogo de escritorio** (**7.0.4** recomendada; abre también en 6.x).
 2. Abre `modelo/MiTeleferico.nlogo`.
-3. Pulsa **`setup`** (construye la estación y las cabinas) y luego **`go`**.
+3. Pulsa **`setup`** (construye la Línea Roja: 3 estaciones, vías y cabinas) y
+   luego **`go`**.
 4. Activa la **vista 3D** con el botón **"3D"** en la esquina superior derecha de la
    vista; rota con el ratón.
 5. Mueve los **sliders** para experimentar en vivo (tasa de llegada, cajas, etc.).
@@ -409,9 +421,9 @@ git push -u origin main
   botella es visible y la mejora al abrir una caja es clara y cuantificable.
 - **Validación en Python puro:** la prueba t de Welch y su p-valor (función beta
   incompleta) sin dependencias, para que corra en cualquier máquina.
-- **Web 3D como extensión multi-estación:** lleva el sistema a la Línea Roja real
-  con ruteo origen→destino, para una defensa visualmente potente, conservando los
-  principios del modelo académico.
+- **Modelo y web sobre la misma Línea Roja:** ambos cubren las 3 estaciones reales
+  con ruteo origen→destino; el NetLogo aporta el rigor académico (colas, prueba t,
+  BehaviorSpace) y la web la defensa visualmente potente.
 
 ---
 
@@ -421,7 +433,7 @@ git push -u origin main
 |---|---|
 | **Definición y Datos (20)** | §2–§4 de este README; `docs/Datos_Historicos.md` (propósito, variables, datos de campo) |
 | **Metodología y Modelo (25)** | `docs/Protocolo_ODD.md` (ODD), `docs/Ecuaciones_y_Algoritmos.md` (Poisson, M/M/c, Erlang C), `modelo/MiTeleferico.nlogo` |
-| **Validación Estadística (15)** | §6; `analisis/validacion.py`, `salida_validacion.txt` (prueba t de Welch, p=0.94) |
+| **Validación Estadística (15)** | §6; `analisis/validacion.py`, `salida_validacion.txt` (prueba t de Welch, p=0.93) |
 | **Experimentación y Mejora (20)** | §7; experimentos `2-Escenarios-Cajas` y `3-Escenario-Tarjeta` + propuesta |
 | **Defensa y Simulación en Vivo (20)** | Modelo NetLogo con vista 3D, sliders, monitores y gráficas; **además** la web 3D inmersiva de la Línea Roja (`web/`); `docs/Guia_Defensa.md` |
 
@@ -429,12 +441,12 @@ git push -u origin main
 
 ## 14. Limitaciones y supuestos
 
-- El **modelo académico (NetLogo)** representa **una sola estación**; la red completa
-  y los transbordos se ilustran en la **web 3D**.
+- El modelo cubre las **3 estaciones de la Línea Roja** con ruteo origen→destino,
+  pero **no modela transbordos** entre líneas ni la red completa de Mi Teleférico.
 - Servicio de caja **exponencial** (supuesto markoviano estándar); la realidad puede
   tener menor varianza.
-- La geometría de la estación (NetLogo) es **esquemática** (zonas por franjas), no un
-  plano arquitectónico exacto.
+- La geometría de las estaciones (NetLogo) es **esquemática** (zonas por franjas y
+  dos vías), no un plano arquitectónico exacto.
 - Los datos de campo son **estimaciones fundamentadas**; deben refrescarse con
   mediciones propias antes de la defensa (ver nota en `docs/Datos_Historicos.md`).
 - No se modela el **abandono** (renegado) ni los grupos familiares.

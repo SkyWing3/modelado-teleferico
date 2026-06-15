@@ -180,7 +180,7 @@ def main():
     t, df, p = t_welch(reales, sims)
 
     print("=" * 62)
-    print(" VALIDACION ESTADISTICA - Estacion 'Mi Teleferico'")
+    print(" VALIDACION ESTADISTICA - Linea Roja 'Mi Teleferico'")
     print("=" * 62)
     print(f" Datos reales     : n={len(reales):>3}  media={media(reales):7.2f} s"
           f"  desv={math.sqrt(varianza_muestral(reales)):6.2f} s")

@@ -1,5 +1,7 @@
 "use client";
 
+import { CableCar, RotateCcw, FastForward, Mouse } from "lucide-react";
+
 const panel = {
   position: "absolute",
   top: 16,
@@ -81,11 +83,37 @@ export default function HUD({
           pointerEvents: "none",
         }}
       >
-        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 1 }}>
-          🚡 Mi Teleférico — Línea Roja 3D
-        </div>
-        <div style={{ fontSize: 12, color: "#bcd0ee" }}>
-          La Paz · El Alto — Central · Cementerio · 16 de Julio
+        <div
+          style={{
+            display: "inline-block",
+            background: "rgba(12,18,34,0.72)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            border: "1px solid rgba(120,150,200,0.28)",
+            borderRadius: 14,
+            padding: "8px 22px",
+            boxShadow: "0 8px 26px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              fontSize: 22,
+              fontWeight: 800,
+              letterSpacing: 1,
+              color: "#f1f5fc",
+              textShadow: "0 1px 3px rgba(0,0,0,0.7)",
+            }}
+          >
+            <CableCar size={24} color="#ff5a5a" strokeWidth={2.4} />
+            Mi Teleférico — Línea Roja 3D
+          </div>
+          <div style={{ fontSize: 12, color: "#cdddf5", marginTop: 2 }}>
+            La Paz · El Alto — Central · Cementerio · 16 de Julio
+          </div>
         </div>
       </div>
 
@@ -149,7 +177,11 @@ export default function HUD({
 
         <div style={{ height: 1, background: "rgba(120,150,200,0.25)", margin: "10px 0" }} />
         <Slider
-          label="⏩ Velocidad de simulación"
+          label={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <FastForward size={13} /> Velocidad de simulación
+            </span>
+          }
           value={velocidadSim}
           min={1}
           max={12}
@@ -169,9 +201,13 @@ export default function HUD({
             color: "#ffd2d2",
             fontWeight: 700,
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
           }}
         >
-          ↻ Reiniciar simulación
+          <RotateCcw size={15} /> Reiniciar simulación
         </button>
       </div>
 
@@ -233,9 +269,14 @@ export default function HUD({
           background: "rgba(12,18,34,0.6)",
           padding: "6px 14px",
           borderRadius: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          whiteSpace: "nowrap",
         }}
       >
-        🖱️ Arrastra para rotar · rueda para zoom · clic derecho para desplazar · cada pasajero elige su estación de destino
+        <Mouse size={14} style={{ flexShrink: 0 }} />
+        Arrastra para rotar · rueda para zoom · clic derecho para desplazar · cada pasajero elige su estación de destino
       </div>
     </>
   );

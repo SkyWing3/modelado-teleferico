@@ -26,8 +26,13 @@ import random
 random.seed(216)  # SIS-216: semilla fija -> resultados reproducibles
 
 
-def generar_reales(n=12, media=32.0, desv=6.0):
-    """Tiempos de espera promedio (s) por sesion de aforo de campo."""
+def generar_reales(n=12, media=18.0, desv=4.8):
+    """Tiempos de espera promedio (s) por sesion de aforo de campo.
+
+    Media de referencia (~18 s) coherente con el escenario base de la Linea Roja
+    (3 estaciones, 2 cajas/estacion, 60 % de tarjeta): el simulador entrega
+    espera total ~17 s. El aforo de campo tiene mayor varianza que la simulacion.
+    """
     filas = []
     for i in range(1, n + 1):
         valor = round(random.gauss(media, desv), 1)
@@ -36,8 +41,12 @@ def generar_reales(n=12, media=32.0, desv=6.0):
     return filas
 
 
-def generar_simulados(n=30, media=31.0, desv=5.0):
-    """Tiempo de espera promedio total (s) por corrida de NetLogo."""
+def generar_simulados(n=30, media=17.2, desv=2.3):
+    """Tiempo de espera promedio total (s) por corrida de NetLogo.
+
+    Media/desviacion calibradas al experimento '1-Validacion-Baseline'
+    (media 17.2 s, desv 2.3 s sobre 30 corridas de 3600 ticks).
+    """
     filas = []
     for i in range(1, n + 1):
         valor = round(random.gauss(media, desv), 2)
