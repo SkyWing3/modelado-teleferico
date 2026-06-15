@@ -23,7 +23,14 @@ function StationLabel({ index }) {
   const [bx, by] = STATIONS[index].base;
   const s = STATIONS[index];
   return (
-    <Html position={[bx, by + 10.5, 0]} center distanceFactor={120} zIndexRange={[10, 0]}>
+    <Html
+      position={[bx, by + 10.5, 0]}
+      center
+      distanceFactor={120}
+      zIndexRange={[10, 0]}
+      pointerEvents="none"
+      style={{ pointerEvents: "none", userSelect: "none" }}
+    >
       <div
         style={{
           padding: "6px 14px",
@@ -37,6 +44,9 @@ function StationLabel({ index }) {
           textAlign: "center",
           border: "2px solid #fff",
           boxShadow: "0 6px 16px rgba(0,0,0,0.4)",
+          pointerEvents: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
       >
         {s.name}
@@ -86,11 +96,17 @@ export default function Scene({ engineRef, speedRef, numeroCabinas }) {
       <OrbitControls
         makeDefault
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.12}
+        rotateSpeed={0.55}
+        zoomSpeed={0.9}
+        panSpeed={0.7}
+        zoomToCursor
+        screenSpacePanning
         target={[95, 16, 0]}
-        minDistance={25}
-        maxDistance={360}
-        maxPolarAngle={Math.PI / 2.1}
+        minDistance={30}
+        maxDistance={340}
+        minPolarAngle={0.18}
+        maxPolarAngle={Math.PI / 2.05}
       />
     </>
   );
