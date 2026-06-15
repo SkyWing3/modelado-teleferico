@@ -2,9 +2,14 @@
 
 import { CableCar, RotateCcw, FastForward, Mouse } from "lucide-react";
 
+// El HUD debe quedar SIEMPRE por encima de las etiquetas 3D (drei <Html>,
+// cuyo z-index llega hasta 10). Por eso todo el HUD usa este z-index.
+const HUD_Z = 50;
+
 const panel = {
   position: "absolute",
   top: 16,
+  zIndex: HUD_Z,
   background: "rgba(12,18,34,0.82)",
   backdropFilter: "blur(8px)",
   border: "1px solid rgba(120,150,200,0.25)",
@@ -81,6 +86,7 @@ export default function HUD({
           transform: "translateX(-50%)",
           textAlign: "center",
           pointerEvents: "none",
+          zIndex: HUD_Z,
         }}
       >
         <div
@@ -264,6 +270,7 @@ export default function HUD({
           bottom: 12,
           left: "50%",
           transform: "translateX(-50%)",
+          zIndex: HUD_Z,
           fontSize: 11.5,
           color: "rgba(233,238,247,0.7)",
           background: "rgba(12,18,34,0.6)",
